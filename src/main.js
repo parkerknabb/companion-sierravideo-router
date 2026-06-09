@@ -10,7 +10,10 @@ class ModuleInstance extends InstanceBase {
 		super(internal)
 		this.socket = null
 		this.buffer = ''
+		this.keepAliveTimer = null
+		this.reconnectTimer = null
 		this.connected = false
+		this.destroyed = false
 		this.capabilities = ''
 		this.updateMode = ''
 		this.modelName = ''
@@ -23,6 +26,7 @@ class ModuleInstance extends InstanceBase {
 	}
 
 	async init(config) {
+		this.destroyed = false
 		this.config = this.normalizeConfig(config)
 		this.log('debug', 'Initializing Sierra Aspen module')
 
@@ -35,7 +39,8 @@ class ModuleInstance extends InstanceBase {
 	// When module gets deleted
 	async destroy() {
 		this.log('debug', 'destroy')
-		this.disconnect()
+		this.destroyed = true
+		this.disconnect(true)
 	}
 
 	async configUpdated(config) {
@@ -73,7 +78,8 @@ class ModuleInstance extends InstanceBase {
 	}
 
 	connect() {
-		this.disconnect()
+		this.disconnect(true)
+		this.clearReconnectTimer()
 
 		if (!this.config.targetIp) {
 			this.updateStatus(InstanceStatus.BadConfig, 'Missing target IP')
@@ -96,6 +102,7 @@ class ModuleInstance extends InstanceBase {
 				this.connected = true
 				this.updateStatus(InstanceStatus.Ok)
 				this.log('debug', `Connected to ${this.config.targetIp}:${this.config.targetPort}`)
+				this.startKeepAlive()
 
 				// Query capabilities, routing size, and current routing state.
 				this.sendRaw('I')
@@ -128,16 +135,62 @@ class ModuleInstance extends InstanceBase {
 			this.log('debug', 'Connection closed')
 			this.socket = null
 			this.connected = false
+			this.stopKeepAlive()
 			this.updateStatus(InstanceStatus.Disconnected)
+			this.scheduleReconnect()
 		})
 	}
 
-	disconnect() {
+	disconnect(intentionally = false) {
+		this.stopKeepAlive()
+		this.clearReconnectTimer()
+
 		if (this.socket) {
 			const socket = this.socket
 			this.socket = null
 			this.connected = false
 			socket.destroy()
+		}
+
+		if (intentionally) {
+			this.connected = false
+		}
+	}
+
+	startKeepAlive() {
+		this.stopKeepAlive()
+		this.keepAliveTimer = setInterval(() => {
+			if (!this.socket || !this.connected) return
+
+			this.log('debug', 'Keepalive TX **!!')
+			this.socket.write('**!!')
+		}, 5 * 60 * 1000)
+	}
+
+	stopKeepAlive() {
+		if (this.keepAliveTimer) {
+			clearInterval(this.keepAliveTimer)
+			this.keepAliveTimer = null
+		}
+	}
+
+	scheduleReconnect() {
+		if (this.destroyed || this.reconnectTimer || !this.config.targetIp) {
+			return
+		}
+
+		this.log('debug', 'Scheduling reconnect in 5 seconds')
+		this.reconnectTimer = setTimeout(() => {
+			this.reconnectTimer = null
+			if (this.destroyed) return
+			this.connect()
+		}, 5000)
+	}
+
+	clearReconnectTimer() {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer)
+			this.reconnectTimer = null
 		}
 	}
 
