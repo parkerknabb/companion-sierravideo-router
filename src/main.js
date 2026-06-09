@@ -24,6 +24,7 @@ class ModuleInstance extends InstanceBase {
 
 	async init(config) {
 		this.config = this.normalizeConfig(config)
+		this.log('debug', 'Initializing Sierra Aspen module')
 
 		this.updateActions()
 		this.updateFeedbacks()
@@ -39,6 +40,7 @@ class ModuleInstance extends InstanceBase {
 
 	async configUpdated(config) {
 		this.config = this.normalizeConfig(config)
+		this.log('debug', 'Configuration updated, reconnecting')
 		this.connect()
 	}
 
