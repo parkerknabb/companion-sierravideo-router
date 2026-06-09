@@ -188,6 +188,16 @@ class ModuleInstance extends InstanceBase {
 
 		this.log('debug', `RX ${cleaned}`)
 
+		if (cleaned.startsWith('Q')) {
+			this.parseModelInfo(cleaned.slice(1).replace(/\s+OK$/, ''))
+			return
+		}
+
+		if (cleaned.startsWith('L')) {
+			this.parseLevelInfo(cleaned.slice(1).replace(/\s+OK$/, ''))
+			return
+		}
+
 		const rawTokens = cleaned.split(/\s+/)
 		const tokens = []
 		for (let i = 0; i < rawTokens.length; i++) {
@@ -261,14 +271,14 @@ class ModuleInstance extends InstanceBase {
 	}
 
 	parseModelInfo(payload) {
-		const values = payload.split('~').filter(Boolean)
-		this.modelName = values[0] || ''
-		this.versionString = values[1] || ''
+		const values = payload.split('~')
+		this.modelName = (values[0] || '').trim()
+		this.versionString = (values[1] || '').trim()
 		this.updateVariableState()
 	}
 
 	parseLevelInfo(payload) {
-		const match = payload.match(/^(\d+),(\d+),(\d+),?(.*)$/)
+		const match = payload.match(/^(\d+),(\d+),(\d+),([\s\S]*)$/)
 		if (!match) return
 
 		this.outputCount = Number.parseInt(match[1], 10) || 0
