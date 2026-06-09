@@ -1,30 +1,52 @@
 module.exports = async function (self) {
 	self.setFeedbackDefinitions({
-		ChannelState: {
-			name: 'Example Feedback',
+		route_matches: {
+			name: 'Output matches input',
 			type: 'boolean',
-			label: 'Channel State',
 			defaultStyle: {
-				bgcolor: 0xff0000,
-				color: 0x000000,
+				bgcolor: 0x008000,
+				color: 0xffffff,
 			},
 			options: [
 				{
-					id: 'num',
+					id: 'output',
 					type: 'number',
-					label: 'Test',
-					default: 5,
+					label: 'Output',
+					default: 1,
+					min: 1,
+					max: 9999,
+				},
+				{
+					id: 'input',
+					type: 'textinput',
+					label: 'Input',
+					default: '1',
+				},
+				{
+					id: 'level',
+					type: 'number',
+					label: 'Level',
+					default: 0,
 					min: 0,
-					max: 10,
+					max: 9999,
 				},
 			],
 			callback: (feedback) => {
-				console.log('Hello world!', feedback.options.num)
-				if (feedback.options.num > 5) {
-					return true
-				} else {
-					return false
+				const output = Number.parseInt(feedback.options.output, 10)
+				const input = String(feedback.options.input).trim()
+				const level = Number.parseInt(feedback.options.level, 10)
+				const levelsToCheck =
+					level === 0 ? self.levelCount || Object.keys(self.crosspoints[output] || {}).length || 1 : 1
+
+				for (let i = 0; i < levelsToCheck; i++) {
+					const currentLevel = level === 0 ? i + 1 : level
+					const currentInput = self.getCrosspoint(output, currentLevel)
+					if (String(currentInput ?? '') !== input) {
+						return false
+					}
 				}
+
+				return true
 			},
 		},
 	})
